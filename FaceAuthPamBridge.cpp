@@ -7,11 +7,10 @@
 //   -> 0 means succeed
 //   -> 100 means user's 128d config file not found or broken ...
 //   -> 101 means machine learning model file not found or broken ...
-
 //   -> 110 camera hardware not found / hardware can not use ...
-
 //   -> 120 means face auth continuous fail count > 3 (continuous succeed 3 times can login)
 //   -> 121 means timeout (5 seconds no face detected)
+//   -> 130 parameter wrong
 
 #include <stdio.h>
 #include <string.h>
@@ -20,6 +19,8 @@
 #include <security/pam_modules.h>
 #include <unistd.h>
 #include <sys/wait.h>
+
+char * exePath = "/usr/lib64/security/pam_camera/FaceAuth";
 
 void pam_display(pam_handle_t *pamh, int style, char const *message) {
 
@@ -97,9 +98,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
         return retval;
     }
 
-    char *executeprocess[4] = {"/home/hjd/CLionProjects/FaceAuth/cmake-build-debug/FaceAuth",
-                               "auth",
-                               const_cast<char *>(pUsername), NULL};
+    char *executeprocess[2] = {exePath, const_cast<char *>(pUsername)};
 
     pid_t c_pid, pid;
     int status;
@@ -139,23 +138,29 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
         }
 
         printf("#### Child Process return code is [%d]\n", WEXITSTATUS(status));
-
+        // code definitions
+        //   -> 0 means succeed
+        //   -> 100 means user's 128d config file not found or broken ...
+        //   -> 101 means machine learning model file not found or broken ...
+        //   -> 110 camera hardware not found / hardware can not use ...
+        //   -> 120 means face auth continuous fail count > 3 (continuous succeed 3 times can login)
+        //   -> 121 means timeout (5 seconds no face detected)
         switch (WEXITSTATUS(status)) {
             case 0:
                 return PAM_SUCCESS;
-            case 1:
-                pam_display(pamh, PAM_TEXT_INFO, "User face information not found");
+            case 100:
+                pam_display(pamh, PAM_TEXT_INFO, "User face info not found or broken");
                 break;
-            case 2:
-                pam_display(pamh, PAM_ERROR_MSG, "Wrong face try too much time");
+            case 101:
+                pam_display(pamh, PAM_ERROR_MSG, "CNN config file not found or broken");
                 break;
-            case 10:
-                pam_display(pamh, PAM_ERROR_MSG, "Model file lost");
+            case 110:
+                pam_display(pamh, PAM_ERROR_MSG, "Realsense Camera not found or not usable");
                 break;
-            case 11:
-                pam_display(pamh, PAM_ERROR_MSG, "Camera not found or broken");
+            case 120:
+                pam_display(pamh, PAM_ERROR_MSG, "Fail too much time");
                 break;
-            case 20:
+            case 121:
                 pam_display(pamh, PAM_ERROR_MSG, "Timeout");
                 break;
             default:
